@@ -1,0 +1,45 @@
+[project]
+name = "future-ledger"
+version = "0.1.0"
+description = "A-share dividend research workbook generator"
+requires-python = ">=3.11"
+dependencies = [
+    "akshare",
+    "pandas",
+    "openpyxl",
+    "typer",
+    "tenacity",
+]
+
+[project.scripts]
+future-ledger = "future_ledger.cli:app"
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "ruff",
+    "mypy",
+]
+
+[tool.uv]
+package = true
+
+[tool.ruff]
+target-version = "py311"
+line-length = 99
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP", "B", "SIM", "S", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/future_ledger/cli.py" = ["B008"]  # typer.Option in defaults is idiomatic
+"tests/**" = ["S101"]  # assert is expected in tests
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

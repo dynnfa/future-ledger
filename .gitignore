@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+.venv/
+
+# uv
+uv.lock
+
+# Tools
+.claude/settings.local.json
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Project artifacts
+.future_ledger/
+reports/
+
+# OS
+.DS_Store

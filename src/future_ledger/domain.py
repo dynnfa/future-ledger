@@ -57,16 +57,83 @@ class PricePoint:
 
 
 @dataclass(frozen=True)
+class DividendYearDetail:
+    """Per-year detail used in the dividend_long sheet."""
+
+    report_year: int
+    report_period: str
+    cash_dividend_per_10_shares: Decimal | None
+    cash_dividend_per_share: Decimal | None
+    reference_price: Decimal | None
+    reference_price_date: date | None
+    dividend_yield_pct: Decimal | None
+    registration_date: date | None
+    ex_dividend_date: date | None
+    plan_status: str | None
+    eps: Decimal | None
+    net_asset_per_share: Decimal | None
+    profit_growth_yoy_pct: Decimal | None
+    source: str
+
+
+@dataclass(frozen=True)
 class DividendRankRow:
     """One row in the dividend_rank output sheet."""
 
+    rank_latest_yield: int | None
     stock_code: str
     stock_name: str
-    latest_annual_yield_pct: Decimal | None = None
-    avg_annual_yield_pct: Decimal | None = None
-    dividend_count_in_window: int = 0
-    trailing_1y_return_pct: Decimal | None = None
-    data_quality_flags: tuple[str, ...] = ()
+    market: str
+    latest_report_year: int | None
+    latest_cash_dividend_per_10_shares: Decimal | None
+    latest_cash_dividend_per_share: Decimal | None
+    reference_price: Decimal | None
+    reference_price_date: date | None
+    latest_dividend_yield_pct: Decimal | None
+    dividend_yield_source: str
+    dividend_year_count_5y: int
+    continuous_dividend_5y: bool
+    avg_dividend_yield_pct_5y: Decimal | None
+    min_dividend_yield_pct_5y: Decimal | None
+    max_dividend_yield_pct_5y: Decimal | None
+    as_of_date: date
+    cash_dividends_1y: Decimal | None
+    total_return_1y_pct: Decimal | None
+    annualized_return_1y_pct: Decimal | None
+    has_missing_years_5y: bool
+    data_quality_flags: tuple[str, ...]
+    source_priority_used: str
+    fetched_at: str
+    annual_fields: dict[str, object]
+
+
+@dataclass(frozen=True)
+class DividendLongRow:
+    """One row in the dividend_long output sheet."""
+
+    stock_code: str
+    stock_name: str
+    market: str
+    report_year: int
+    report_period: str
+    cash_dividend_per_10_shares: Decimal | None
+    cash_dividend_per_share: Decimal | None
+    ex_dividend_date: date | None
+    registration_date: date | None
+    plan_status: str | None
+    eps: Decimal | None
+    net_asset_per_share: Decimal | None
+    profit_growth_yoy_pct: Decimal | None
+    dividend_yield_pct: Decimal | None
+    source: str
+
+
+@dataclass(frozen=True)
+class MetadataRow:
+    """A key-value row in the metadata output sheet."""
+
+    key: str
+    value: str
 
 
 @dataclass(frozen=True)
@@ -84,7 +151,7 @@ class ReportTables:
     """All tables that make up the output workbook."""
 
     dividend_rank: list[DividendRankRow]
-    dividend_long: list[DividendRecord]
+    dividend_long: list[DividendLongRow]
     price_points: list[PricePoint]
     source_errors: list[SourceErrorRow]
-    metadata: dict[str, str]
+    metadata: list[MetadataRow]

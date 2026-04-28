@@ -39,12 +39,20 @@ class DividendRecord:
     """One normalized annual dividend record for a stock."""
 
     stock_code: str
+    stock_name: str
+    market: str
     report_year: int
-    cash_dividend_per_share: Decimal
+    report_period: str
+    cash_dividend_per_10_shares: Decimal | None
+    cash_dividend_per_share: Decimal | None
     ex_dividend_date: date | None = None
     registration_date: date | None = None
     plan_status: str | None = None
+    eps: Decimal | None = None
+    net_asset_per_share: Decimal | None = None
+    profit_growth_yoy_pct: Decimal | None = None
     provider_yield_pct: Decimal | None = None
+    source: str = ""
 
 
 @dataclass(frozen=True)

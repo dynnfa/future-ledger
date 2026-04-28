@@ -17,6 +17,7 @@ uv.lock
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
+.coverage
 
 # Project artifacts
 .future_ledger/

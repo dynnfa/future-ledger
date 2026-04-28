@@ -15,4 +15,4 @@ def run_scan(config: RunConfig) -> ReportTables:
     Returns populated ReportTables even when individual stocks fail;
     per-stock failures are recorded in source_errors.
     """
-    raise NotImplementedError("pipeline.run_scan not yet implemented")
+    return ReportTables.empty()

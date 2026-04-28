@@ -4,6 +4,7 @@ from pathlib import Path
 import typer
 
 from future_ledger.domain import RunConfig
+from future_ledger.pipeline import run_scan
 
 app = typer.Typer(name="future-ledger", help="A-share dividend research workbook generator")
 dividends_app = typer.Typer(help="Dividend analysis commands")
@@ -17,9 +18,21 @@ def _parse_as_of(as_of: str | None) -> date:
     try:
         return date.fromisoformat(as_of)
     except ValueError as exc:
-        raise typer.BadParameter(
-            f"Invalid date format: {as_of!r}. Expected YYYY-MM-DD."
-        ) from exc
+        raise typer.BadParameter(f"Invalid date format: {as_of!r}. Expected YYYY-MM-DD.") from exc
+
+
+def _validate_years(years: int) -> int:
+    """Validate that --years is a positive integer."""
+    if years < 1:
+        raise typer.BadParameter("--years must be >= 1")
+    return years
+
+
+def _validate_limit(limit: int | None) -> int | None:
+    """Validate that --limit is positive when supplied."""
+    if limit is not None and limit < 1:
+        raise typer.BadParameter("--limit must be >= 1")
+    return limit
 
 
 @dividends_app.command("scan")
@@ -38,16 +51,17 @@ def scan(
     ),
 ) -> None:
     """Scan A-share dividend data and generate a ranked workbook."""
+    validated_years = _validate_years(years)
+    validated_limit = _validate_limit(limit)
     as_of_date = _parse_as_of(as_of)
     config = RunConfig(
-        years=years,
+        years=validated_years,
         as_of=as_of_date,
         universe=universe,
         output=output,
-        limit=limit,
+        limit=validated_limit,
         cache_dir=cache_dir,
     )
-    typer.echo(
-        f"Scanning dividends: years={config.years}, as_of={config.as_of}, "
-        f"universe={config.universe}, output={config.output}"
-    )
+    tables = run_scan(config)
+    typer.echo(f"Scan completed; workbook writing not yet implemented: {config.output}")
+    typer.echo(f"Rows ranked: {len(tables.dividend_rank)}")

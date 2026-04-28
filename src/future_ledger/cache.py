@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pandas as pd
+import pandas as pd  # type: ignore[import-untyped]
 
 
 def cache_key(stage: str, symbol: str, ext: str = ".csv") -> str:

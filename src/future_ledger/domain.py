@@ -31,7 +31,7 @@ class StockIdentity:
 
     code: str
     name: str
-    market: str  # e.g. "SH", "SZ"
+    market: str  # e.g. "SH", "SZ", "BJ"
 
 
 @dataclass(frozen=True)
@@ -155,3 +155,14 @@ class ReportTables:
     price_points: list[PricePoint]
     source_errors: list[SourceErrorRow]
     metadata: list[MetadataRow]
+
+    @classmethod
+    def empty(cls) -> ReportTables:
+        """Return an empty report with no rows in any table."""
+        return cls(
+            dividend_rank=[],
+            dividend_long=[],
+            price_points=[],
+            source_errors=[],
+            metadata=[],
+        )

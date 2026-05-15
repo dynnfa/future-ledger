@@ -14,6 +14,7 @@ uv.lock
 
 # Tools
 .claude/settings.local.json
+*.swp
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/

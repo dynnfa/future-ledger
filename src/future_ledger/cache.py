@@ -10,6 +10,8 @@ from pathlib import Path
 
 import pandas as pd  # type: ignore[import-untyped]
 
+from future_ledger.errors import SourceError
+
 CACHE_STAGES = frozenset({"spot", "dividend_detail", "price_history"})
 _SYMBOL_RE = re.compile(r"^\d{6}$")
 _DATE_RE = re.compile(r"^\d{8}$")
@@ -43,12 +45,25 @@ def cache_key(
 
 def read_cache(cache_dir: Path, key: str) -> pd.DataFrame | None:
     """Read a cached DataFrame, or return None if absent."""
-    raise NotImplementedError("cache.read_cache not yet implemented")
+    path = _cache_path(cache_dir, key)
+    if not path.exists():
+        return None
+
+    try:
+        return pd.read_csv(path, encoding="utf-8", dtype=str)
+    except Exception as exc:
+        raise SourceError(
+            f"failed to read cache snapshot: {key}",
+            stage="cache_read",
+            raw_detail=f"{exc.__class__.__name__}: {exc}",
+        ) from exc
 
 
 def write_cache(cache_dir: Path, key: str, df: pd.DataFrame) -> None:
     """Persist a DataFrame to the cache directory."""
-    raise NotImplementedError("cache.write_cache not yet implemented")
+    path = _cache_path(cache_dir, key)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(path, index=False, encoding="utf-8")
 
 
 def _validate_stage(stage: str) -> None:
@@ -75,3 +90,14 @@ def _validate_date_range(start_date: str, end_date: str) -> None:
         raise ValueError("end_date must use YYYYMMDD")
     if start_date > end_date:
         raise ValueError("start_date must be <= end_date")
+
+
+def _cache_path(cache_dir: Path, key: str) -> Path:
+    if "\\" in key:
+        raise ValueError("cache key must be a relative path without traversal segments")
+
+    key_path = Path(key)
+    if key_path.is_absolute() or ".." in key_path.parts or "." in key_path.parts:
+        raise ValueError("cache key must be a relative path without traversal segments")
+
+    return cache_dir / key_path

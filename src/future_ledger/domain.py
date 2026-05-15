@@ -11,6 +11,10 @@ from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import pandas as pd  # type: ignore[import-untyped]
 
 
 @dataclass(frozen=True)
@@ -152,6 +156,30 @@ class SourceErrorRow:
     stage: str  # e.g. "dividend_fetch", "price_fetch", "normalize"
     message: str
     raw_detail: str | None = None
+
+
+@dataclass(frozen=True)
+class SourceMetadata:
+    """Lineage metadata for one upstream source fetch."""
+
+    source_name: str
+    stage: str
+    symbol: str
+    fetched_at: str
+    akshare_version: str
+    row_count: int
+    upstream_function: str
+    request_start_date: str | None = None
+    request_end_date: str | None = None
+
+
+@dataclass(frozen=True)
+class SourceFetchResult:
+    """A raw upstream frame with lineage metadata and an optional source error."""
+
+    frame: pd.DataFrame
+    metadata: SourceMetadata
+    error: SourceErrorRow | None = None
 
 
 @dataclass(frozen=True)

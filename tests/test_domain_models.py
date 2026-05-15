@@ -4,6 +4,7 @@ from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
+import pandas as pd  # type: ignore[import-untyped]
 import pytest
 
 from future_ledger.domain import (
@@ -12,6 +13,9 @@ from future_ledger.domain import (
     DividendYearDetail,
     MetadataRow,
     RunConfig,
+    SourceErrorRow,
+    SourceFetchResult,
+    SourceMetadata,
 )
 
 
@@ -269,3 +273,64 @@ class TestMetadataRow:
         row = MetadataRow(key="version", value="0.1.0")
         with pytest.raises(AttributeError):
             row.key = "changed"  # type: ignore[misc]
+
+
+class TestSourceFetchResult:
+    def test_source_metadata_construction(self) -> None:
+        metadata = SourceMetadata(
+            source_name="akshare",
+            stage="price_fetch",
+            symbol="600000",
+            fetched_at="2026-05-14T08:30:00+00:00",
+            akshare_version="1.17.0",
+            row_count=2,
+            upstream_function="stock_zh_a_hist",
+            request_start_date="20250420",
+            request_end_date="20260420",
+        )
+
+        assert metadata.source_name == "akshare"
+        assert metadata.stage == "price_fetch"
+        assert metadata.symbol == "600000"
+        assert metadata.row_count == 2
+        assert metadata.request_start_date == "20250420"
+        assert metadata.request_end_date == "20260420"
+        assert metadata.upstream_function == "stock_zh_a_hist"
+
+    def test_source_fetch_result_carries_frame_metadata_and_error(self) -> None:
+        frame = pd.DataFrame([{"代码": "600000", "名称": "浦发银行"}])
+        metadata = SourceMetadata(
+            source_name="akshare",
+            stage="spot_fetch",
+            symbol="all_a",
+            fetched_at="2026-05-14T08:30:00+00:00",
+            akshare_version="1.17.0",
+            row_count=1,
+            upstream_function="stock_zh_a_spot_em",
+        )
+        error = SourceErrorRow(
+            stock_code="all_a",
+            stage="spot_fetch",
+            message="empty upstream frame",
+            raw_detail=None,
+        )
+
+        result = SourceFetchResult(frame=frame, metadata=metadata, error=error)
+
+        assert result.frame.equals(frame)
+        assert result.metadata == metadata
+        assert result.error == error
+
+    def test_source_metadata_is_frozen(self) -> None:
+        metadata = SourceMetadata(
+            source_name="akshare",
+            stage="dividend_fetch",
+            symbol="600000",
+            fetched_at="2026-05-14T08:30:00+00:00",
+            akshare_version="1.17.0",
+            row_count=0,
+            upstream_function="stock_fhps_detail_em",
+        )
+
+        with pytest.raises(AttributeError):
+            metadata.row_count = 1  # type: ignore[misc]

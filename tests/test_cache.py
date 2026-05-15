@@ -43,7 +43,10 @@ def test_cache_key_rejects_unknown_stage() -> None:
 
 
 def test_price_history_cache_key_requires_both_dates() -> None:
-    with pytest.raises(ValueError, match="price_history cache keys require start_date and end_date"):
+    with pytest.raises(
+        ValueError,
+        match="price_history cache keys require start_date and end_date",
+    ):
         cache_key("price_history", "600000", start_date="20250420")
 
 

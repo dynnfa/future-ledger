@@ -4,8 +4,8 @@ from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
-import pytest
 import pandas as pd  # type: ignore[import-untyped]
+import pytest
 
 from future_ledger.domain import (
     DividendLongRow,

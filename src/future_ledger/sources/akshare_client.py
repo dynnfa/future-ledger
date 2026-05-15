@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-from datetime import datetime, timezone
 import re
+from collections.abc import Callable
+from datetime import UTC, datetime
 
 import akshare as ak  # type: ignore[import-untyped]
 import pandas as pd  # type: ignore[import-untyped]
@@ -23,7 +23,7 @@ FrameCall = Callable[[], object]
 
 
 def _utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def fetch_a_share_spot(*, clock: Clock = _utc_now) -> SourceFetchResult:

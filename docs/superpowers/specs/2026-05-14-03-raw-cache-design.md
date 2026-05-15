@@ -17,7 +17,7 @@ Persist raw upstream AKShare frames and source metadata so every workbook run ca
 ## Inputs
 
 - `cache_dir: Path`.
-- `stage: str` with one of `spot`, `dividend_detail`, or `price_history`.
+- `stage: str` with one of the cache stages `spot`, `dividend_detail`, or `price_history`.
 - `symbol: str`, using `all_a` for the A-share spot frame and six-digit stock codes for per-stock frames.
 - Raw pandas `DataFrame`.
 - `SourceMetadata` values: source name, stage, symbol, fetched timestamp, AKShare version, row count, request start date, request end date, and upstream function name.
@@ -32,6 +32,7 @@ Persist raw upstream AKShare frames and source metadata so every workbook run ca
 ## Domain Contracts
 
 - Cache keys are deterministic and contain no path traversal segments.
+- Cache stage names are storage locations, distinct from source metadata stages `spot_fetch`, `dividend_fetch`, and `price_fetch`, which are preserved inside metadata sidecars.
 - `spot` key: `spot/all_a.csv`.
 - `dividend_detail` key: `dividend_detail/<symbol>.csv`.
 - `price_history` key: `price_history/<symbol>_<start_date>_<end_date>.csv` where dates use `YYYYMMDD`.

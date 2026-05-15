@@ -54,8 +54,10 @@ This module is the boundary between calculation modules and output modules. The 
 
 - Recoverable per-stock failures are appended to `ReportTables.source_errors` and do not stop assembly for other stocks.
 - A stock with no valid dividend records still produces a rank row with empty dividend fields, `rank_latest_yield=None`, and `data_quality_flags=("no_valid_dividend_records",)`.
+- Missing cash dividend or ex-dividend dates from metrics produce empty affected metric fields and preserve `missing_cash_dividend` or `missing_ex_dividend_date`.
 - Missing reference prices produce empty yield fields and the `missing_reference_price` flag.
 - Missing return start or end prices produce empty return fields and the `missing_return_price` flag.
+- Invalid return start prices produce empty return fields and preserve `invalid_return_start_price`.
 - Missing dividend certainty for the one-year return window produces the `uncertain_dividend_window` flag.
 - Fatal programmer errors, such as passing objects that are not domain types, are not converted into `SourceErrorRow`.
 
@@ -63,9 +65,12 @@ This module is the boundary between calculation modules and output modules. The 
 
 - `no_valid_dividend_records`: the stock has no normalized dividend records after dividend normalization.
 - `has_missing_years_5y`: fewer than `RunConfig.years` report years are available.
+- `missing_cash_dividend`: a dividend record lacks per-share cash dividend.
+- `missing_ex_dividend_date`: a dividend record lacks ex-dividend date.
 - `missing_reference_price`: no usable price exists on or before the ex-dividend date.
 - `missing_return_price`: the one-year return window lacks a usable start or end price.
 - `uncertain_dividend_window`: source data cannot determine whether dividends occurred inside the return window.
+- `invalid_return_start_price`: the return start close is zero or negative despite normalization guarantees.
 - `duplicate_report_period`: dividend normalization reported more than one row for the same report period.
 - `empty_dividend_detail`: the dividend source returned an empty frame for the stock.
 

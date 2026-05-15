@@ -53,7 +53,7 @@ Define the project-wide verification strategy for FutureLedger v0 so default CI 
 ## Data Quality Flags
 
 - Every data quality flag introduced by module specs must have at least one unit or integration test.
-- Required tested flags: `no_valid_dividend_records`, `has_missing_years_5y`, `missing_reference_price`, `missing_return_price`, `uncertain_dividend_window`, `duplicate_report_period`, and `empty_dividend_detail`.
+- Required tested flags: `no_valid_dividend_records`, `has_missing_years_5y`, `missing_cash_dividend`, `missing_ex_dividend_date`, `missing_reference_price`, `missing_return_price`, `uncertain_dividend_window`, `invalid_return_start_price`, `duplicate_report_period`, and `empty_dividend_detail`.
 
 ## Acceptance Criteria
 

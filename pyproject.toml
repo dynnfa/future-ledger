@@ -43,3 +43,6 @@ strict = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+markers = [
+    "live_akshare: tests that call live AKShare endpoints and are skipped by default",
+]

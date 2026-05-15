@@ -10,7 +10,9 @@ from future_ledger.normalize.prices import normalize_price_history
 
 
 def test_normalize_price_history_sorts_by_date() -> None:
-    frame = pd.read_csv(Path("tests/fixtures/prices/600000_daily.csv"))
+    frame = pd.read_csv(
+        Path("tests/fixtures/prices/600000_daily_20250630_20260417.csv")
+    )
 
     points = normalize_price_history("600000", frame)
 

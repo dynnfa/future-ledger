@@ -6,7 +6,9 @@ from collections.abc import Iterable
 from pathlib import Path
 
 import pytest
+from tenacity import wait_none
 
+from future_ledger.sources import akshare_client
 from future_ledger.sources.akshare_client import fetch_a_share_spot
 
 TEST_ROOT = Path("tests")
@@ -36,9 +38,20 @@ def test_live_tests_are_marked_live_akshare() -> None:
         assert "live_akshare" in marks, f"Live test file lacks marker: {path}"
 
 
-def test_default_tests_block_directly_imported_akshare_source_client() -> None:
-    with pytest.raises(RuntimeError, match="Network access disabled"):
-        fetch_a_share_spot()
+def test_default_tests_block_directly_imported_akshare_source_client(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(akshare_client, "_RETRY_WAIT", wait_none())
+
+    result = fetch_a_share_spot()
+
+    assert result.frame.empty
+    assert result.metadata.stage == "spot_fetch"
+    assert result.metadata.symbol == "all_a"
+    assert result.error is not None
+    assert result.error.stage == "spot_fetch"
+    assert result.error.stock_code == "all_a"
+    assert result.error.message.startswith("RuntimeError: Network access disabled")
 
 
 def _pytest_mark_names(path: Path) -> Iterable[str]:

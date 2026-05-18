@@ -6,7 +6,18 @@ class FutureLedgerError(Exception):
 
 
 class SourceError(FutureLedgerError):
-    """Raised when an upstream data source fails or returns unexpected data."""
+    """Raised when an upstream data source or source-layer artifact fails."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        stage: str | None = None,
+        raw_detail: str | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.stage = stage
+        self.raw_detail = raw_detail
 
 
 class ValidationError(FutureLedgerError):

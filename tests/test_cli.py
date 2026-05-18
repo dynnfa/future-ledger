@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 from typer.testing import CliRunner
 
@@ -33,17 +35,25 @@ def test_scan_invalid_as_of(runner: CliRunner) -> None:
 
 def test_scan_valid_as_of(runner: CliRunner, monkeypatch: pytest.MonkeyPatch) -> None:
     captured: dict[str, RunConfig] = {}
+    written: dict[str, Path] = {}
 
     def fake_run_scan(config: RunConfig) -> ReportTables:
         captured["config"] = config
         return ReportTables.empty()
 
+    def fake_write_workbook(tables: ReportTables, output: Path) -> Path:
+        assert tables == ReportTables.empty()
+        written["output"] = output
+        return output
+
     monkeypatch.setattr("future_ledger.cli.run_scan", fake_run_scan)
+    monkeypatch.setattr("future_ledger.cli.write_workbook", fake_write_workbook)
     result = runner.invoke(app, ["dividends", "scan", "--as-of", "2026-01-15"])
 
     assert result.exit_code == 0
     assert str(captured["config"].as_of) == "2026-01-15"
-    assert "workbook writing not yet implemented" in result.output
+    assert written["output"] == captured["config"].output
+    assert "Workbook written: reports/dividend_rank.xlsx" in result.output
     assert "Rows ranked: 0" in result.output
 
 
@@ -57,6 +67,10 @@ def test_scan_uses_default_arguments(
         return ReportTables.empty()
 
     monkeypatch.setattr("future_ledger.cli.run_scan", fake_run_scan)
+    monkeypatch.setattr(
+        "future_ledger.cli.write_workbook",
+        lambda tables, output: output,
+    )
     result = runner.invoke(app, ["dividends", "scan"])
 
     assert result.exit_code == 0

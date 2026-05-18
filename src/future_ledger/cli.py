@@ -5,6 +5,7 @@ import typer
 
 from future_ledger.domain import RunConfig
 from future_ledger.pipeline import run_scan
+from future_ledger.workbook_writer import write_workbook
 
 app = typer.Typer(name="future-ledger", help="A-share dividend research workbook generator")
 dividends_app = typer.Typer(help="Dividend analysis commands")
@@ -63,5 +64,6 @@ def scan(
         cache_dir=cache_dir,
     )
     tables = run_scan(config)
-    typer.echo(f"Scan completed; workbook writing not yet implemented: {config.output}")
+    written_path = write_workbook(tables, config.output)
+    typer.echo(f"Workbook written: {written_path}")
     typer.echo(f"Rows ranked: {len(tables.dividend_rank)}")

@@ -42,6 +42,9 @@ def build_universe(
         if code is None:
             errors.append(_universe_error("", "missing stock code", raw_detail))
             continue
+        if len(code) != 6:
+            errors.append(_universe_error(code, "invalid stock code length", raw_detail))
+            continue
 
         name = _string_or_none(row.get("名称"))
         if name is None:

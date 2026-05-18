@@ -141,6 +141,57 @@ def test_run_scan_records_cache_write_error_and_continues_per_stock(
     )
 
 
+def test_run_scan_records_overlong_stock_code_and_continues_per_stock(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    spot_frame = pd.DataFrame(
+        [
+            {"代码": "6000000", "名称": "过长代码"},
+            {"代码": "000001", "名称": "平安银行"},
+        ]
+    )
+    calls: list[str] = []
+
+    monkeypatch.setattr(
+        "future_ledger.pipeline.fetch_a_share_spot",
+        lambda: _result(spot_frame, "spot_fetch", "all_a", "stock_zh_a_spot_em"),
+    )
+
+    def fake_dividend(symbol: str) -> SourceFetchResult:
+        calls.append(f"dividend:{symbol}")
+        return _result(
+            pd.DataFrame([{"代码": symbol, "分红年度": "2025"}]),
+            "dividend_fetch",
+            symbol,
+            "stock_fhps_detail_em",
+        )
+
+    def fake_price(symbol: str, start_date: str, end_date: str) -> SourceFetchResult:
+        calls.append(f"price:{symbol}:{start_date}:{end_date}")
+        return _result(
+            pd.DataFrame([{"日期": "2026-04-17", "收盘": "10.25"}]),
+            "price_fetch",
+            symbol,
+            "stock_zh_a_hist",
+            request_start_date=start_date,
+            request_end_date=end_date,
+        )
+
+    monkeypatch.setattr("future_ledger.pipeline.fetch_dividend_detail", fake_dividend)
+    monkeypatch.setattr("future_ledger.pipeline.fetch_price_history", fake_price)
+
+    tables = run_scan(_config(tmp_path))
+
+    assert calls == ["dividend:000001", "price:000001:20250420:20260420"]
+    assert any(
+        error.stock_code == "6000000"
+        and error.stage == "universe"
+        and error.message == "invalid stock code length"
+        for error in tables.source_errors
+    )
+
+
 def test_run_scan_does_not_overwrite_cache_for_failed_live_fetch(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

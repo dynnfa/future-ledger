@@ -31,8 +31,9 @@ def normalize_price_history(
             errors.append(_error(stock_code, close_error, row, metadata))
             continue
 
-        assert parsed_date is not None
-        assert parsed_close is not None
+        if parsed_date is None or parsed_close is None:
+            continue
+
         point = PricePoint(
             stock_code=stock_code,
             date=parsed_date,

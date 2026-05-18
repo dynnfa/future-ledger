@@ -30,13 +30,14 @@ def normalize_dividend_detail(
             errors.append(_error(stock.code, "missing report period", row))
             continue
 
-        report_year = _report_year_or_none(report_period)
-        if report_year is None:
+        canonical_report_period = _canonical_report_period_or_none(report_period)
+        if canonical_report_period is None:
             errors.append(_error(stock.code, "invalid report period", row))
             continue
 
+        report_year = int(canonical_report_period[:4])
         priority = _plan_status_priority(row.get("方案进度"))
-        existing = selected_rows.get(report_period)
+        existing = selected_rows.get(canonical_report_period)
         if existing is not None:
             errors.append(_error(stock.code, "duplicate report period", row))
             existing_priority, existing_index, _, _ = existing
@@ -45,7 +46,7 @@ def normalize_dividend_detail(
             if priority == existing_priority and index < existing_index:
                 continue
 
-        selected_rows[report_period] = (priority, index, report_year, row)
+        selected_rows[canonical_report_period] = (priority, index, report_year, row)
 
     records = [
         _record_from_row(stock, report_year, report_period, row, errors)
@@ -123,14 +124,13 @@ def _plan_status_priority(value: Any) -> int:
     return PLAN_STATUS_PRIORITY.get(status, 1)
 
 
-def _report_year_or_none(report_period: str) -> int | None:
+def _canonical_report_period_or_none(report_period: str) -> str | None:
     if len(report_period) < 4 or not report_period[:4].isdigit():
         return None
     try:
-        _date_or_none_required(report_period)
+        return _date_or_none_required(report_period).isoformat()
     except ValueError:
         return None
-    return int(report_period[:4])
 
 
 def _decimal_or_none(

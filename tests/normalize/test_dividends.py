@@ -123,6 +123,23 @@ def test_normalize_dividend_detail_prefers_later_duplicate_when_priority_ties() 
     assert errors[0].message == "duplicate report period"
 
 
+def test_normalize_dividend_detail_deduplicates_canonical_report_periods() -> None:
+    frame = pd.DataFrame(
+        [
+            {"报告期": "2024/12/31", "每10股派息": "3.50", "方案进度": "董事会预案"},
+            {"报告期": "2024-12-31", "每10股派息": "4.20", "方案进度": "实施"},
+        ]
+    )
+
+    records, errors = normalize_dividend_detail(_stock("600000", "浦发银行", "SH"), frame)
+
+    assert len(records) == 1
+    assert records[0].report_period == "2024-12-31"
+    assert records[0].cash_dividend_per_10_shares == Decimal("4.20")
+    assert len(errors) == 1
+    assert errors[0].message == "duplicate report period"
+
+
 def test_percent_fields_keep_percent_units() -> None:
     frame = pd.DataFrame(
         [

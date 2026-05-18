@@ -18,7 +18,6 @@ from future_ledger.report_assembly import (
     assemble_report_tables,
 )
 
-
 ANNUAL_SUFFIXES = (
     "report_period",
     "cash_dividend_per_10_shares",
@@ -333,7 +332,9 @@ def _return_metric(
         start_price_date=date(2025, 4, 21),
         end_price_date=date(2026, 4, 17),
         cash_dividends_1y=Decimal(cash_dividends_1y) if cash_dividends_1y is not None else None,
-        total_return_1y_pct=Decimal(total_return_1y_pct) if total_return_1y_pct is not None else None,
+        total_return_1y_pct=(
+            Decimal(total_return_1y_pct) if total_return_1y_pct is not None else None
+        ),
         annualized_return_1y_pct=(
             Decimal(total_return_1y_pct) if total_return_1y_pct is not None else None
         ),

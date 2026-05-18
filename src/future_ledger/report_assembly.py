@@ -146,7 +146,7 @@ def _dividends_by_stock(
     stocks: Sequence[StockIdentity],
     dividends: Sequence[DividendRecord],
 ) -> dict[str, list[DividendRecord]]:
-    grouped = {stock.code: [] for stock in stocks}
+    grouped: dict[str, list[DividendRecord]] = {stock.code: [] for stock in stocks}
     for record in dividends:
         if record.stock_code in grouped:
             grouped[record.stock_code].append(record)
@@ -200,7 +200,9 @@ def _rank_row(
             latest_record.cash_dividend_per_share if latest_record is not None else None
         ),
         reference_price=latest_metric.reference_price if latest_metric is not None else None,
-        reference_price_date=(latest_metric.reference_price_date if latest_metric is not None else None),
+        reference_price_date=(
+            latest_metric.reference_price_date if latest_metric is not None else None
+        ),
         latest_dividend_yield_pct=(
             latest_metric.dividend_yield_pct if latest_metric is not None else None
         ),
@@ -216,7 +218,9 @@ def _rank_row(
         max_dividend_yield_pct_5y=max(yield_values) if yield_values else None,
         as_of_date=config.as_of,
         cash_dividends_1y=return_metric.cash_dividends_1y if return_metric is not None else None,
-        total_return_1y_pct=(return_metric.total_return_1y_pct if return_metric is not None else None),
+        total_return_1y_pct=(
+            return_metric.total_return_1y_pct if return_metric is not None else None
+        ),
         annualized_return_1y_pct=(
             return_metric.annualized_return_1y_pct if return_metric is not None else None
         ),
@@ -394,11 +398,11 @@ def _used_price_points(
     for metric in dividend_metrics:
         if metric.reference_price_date is not None:
             used_keys.add((metric.stock_code, metric.reference_price_date))
-    for metric in return_metrics:
-        if metric.start_price_date is not None:
-            used_keys.add((metric.stock_code, metric.start_price_date))
-        if metric.end_price_date is not None:
-            used_keys.add((metric.stock_code, metric.end_price_date))
+    for return_metric in return_metrics:
+        if return_metric.start_price_date is not None:
+            used_keys.add((return_metric.stock_code, return_metric.start_price_date))
+        if return_metric.end_price_date is not None:
+            used_keys.add((return_metric.stock_code, return_metric.end_price_date))
 
     selected = [point for point in prices if (point.stock_code, point.date) in used_keys]
     return sorted(

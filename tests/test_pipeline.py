@@ -27,7 +27,7 @@ def test_run_scan_writes_raw_cache_snapshots_for_successful_fetches(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     spot_frame = pd.DataFrame([{"代码": "600000", "名称": "浦发银行"}])
-    dividend_frame = pd.DataFrame([{"代码": "600000", "分红年度": "2025"}])
+    dividend_frame = pd.DataFrame([{"报告期": "2025-12-31", "每10股派息": "4.10"}])
     price_frame = pd.DataFrame([{"日期": "2026-04-17", "收盘": "10.25"}])
 
     monkeypatch.setattr(
@@ -69,7 +69,7 @@ def test_run_scan_writes_raw_cache_snapshots_for_successful_fetches(
     cached_dividend = read_cache(tmp_path / "cache", dividend_key)
     assert cached_dividend is not None
     assert cached_dividend.astype(str).to_dict(orient="records") == [
-        {"代码": "600000", "分红年度": "2025"}
+        {"报告期": "2025-12-31", "每10股派息": "4.10"}
     ]
 
     price_key = cache_key(

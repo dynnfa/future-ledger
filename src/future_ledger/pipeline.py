@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 from future_ledger.cache import cache_key, cache_snapshot_paths, write_cache, write_metadata
@@ -154,7 +154,7 @@ def run_scan(config: RunConfig) -> ReportTables:
         return_metrics=return_metrics,
         source_errors=source_errors,
         source_metadata=source_metadata,
-        generated_at=datetime.now(timezone.utc).isoformat(),
+        generated_at=datetime.now(UTC).isoformat(),
     )
 
 

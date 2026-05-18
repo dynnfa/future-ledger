@@ -23,14 +23,15 @@ def resolve_reference_price(
     if ex_dividend_date is None:
         return ReferencePriceResult(None, None, REFERENCE_PRICE_RULE, False)
 
-    eligible = sorted(
-        (point for point in points if point.date <= ex_dividend_date),
-        key=lambda point: point.date,
-    )
-    if not eligible:
+    selected: PricePoint | None = None
+    for point in points:
+        if point.date > ex_dividend_date:
+            break
+        selected = point
+
+    if selected is None:
         return ReferencePriceResult(None, None, REFERENCE_PRICE_RULE, False)
 
-    selected = eligible[-1]
     return ReferencePriceResult(
         reference_price=selected.close,
         reference_price_date=selected.date,

@@ -78,20 +78,16 @@ def calculate_trailing_one_year_return(
 
 
 def _first_on_or_after(points: list[PricePoint], target_date: date) -> PricePoint | None:
-    eligible = sorted(
-        (point for point in points if point.date >= target_date),
-        key=lambda point: point.date,
-    )
-    if not eligible:
-        return None
-    return eligible[0]
+    for point in points:
+        if point.date >= target_date:
+            return point
+    return None
 
 
 def _last_on_or_before(points: list[PricePoint], target_date: date) -> PricePoint | None:
-    eligible = sorted(
-        (point for point in points if point.date <= target_date),
-        key=lambda point: point.date,
-    )
-    if not eligible:
-        return None
-    return eligible[-1]
+    selected: PricePoint | None = None
+    for point in points:
+        if point.date > target_date:
+            break
+        selected = point
+    return selected

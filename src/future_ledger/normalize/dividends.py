@@ -6,50 +6,41 @@ from typing import Any
 
 import pandas as pd  # type: ignore[import-untyped]
 
-from future_ledger.domain import DividendRecord, SourceErrorRow
+from future_ledger.domain import DividendRecord, SourceErrorRow, StockIdentity
 
 SOURCE_NAME = "akshare.stock_fhps_detail_em"
+NORMALIZE_STAGE = "dividend_normalize"
 
 
 def normalize_dividend_detail(
-    stock_code: str, stock_name: str, frame: pd.DataFrame
+    stock: StockIdentity, frame: pd.DataFrame
 ) -> tuple[list[DividendRecord], list[SourceErrorRow]]:
     records: list[DividendRecord] = []
     errors: list[SourceErrorRow] = []
-    seen_years: set[int] = set()
+    seen_periods: set[str] = set()
 
     for row in frame.to_dict(orient="records"):
         report_period = _string_or_none(row.get("报告期"))
         if report_period is None:
-            errors.append(
-                SourceErrorRow(
-                    stock_code=stock_code,
-                    stage="normalize",
-                    message="missing report period",
-                    raw_detail=str(row),
-                )
-            )
+            errors.append(_error(stock.code, "missing report period", row))
             continue
 
-        report_year = int(report_period[:4])
-        if report_year in seen_years:
-            errors.append(
-                SourceErrorRow(
-                    stock_code=stock_code,
-                    stage="normalize",
-                    message="duplicate report period",
-                    raw_detail=str(row),
-                )
-            )
+        report_year = _report_year_or_none(report_period)
+        if report_year is None:
+            errors.append(_error(stock.code, "invalid report period", row))
+            continue
+
+        if report_period in seen_periods:
+            errors.append(_error(stock.code, "duplicate report period", row))
             continue
 
         cash_dividend_per_10_shares = _decimal_or_none(row.get("每10股派息"))
-        seen_years.add(report_year)
+        seen_periods.add(report_period)
         records.append(
             DividendRecord(
-                stock_code=stock_code,
-                stock_name=stock_name,
-                market=_market_for_code(stock_code),
+                stock_code=stock.code,
+                stock_name=stock.name,
+                market=stock.market,
                 report_year=report_year,
                 report_period=report_period,
                 cash_dividend_per_10_shares=cash_dividend_per_10_shares,
@@ -68,14 +59,11 @@ def normalize_dividend_detail(
     return sorted(records, key=lambda item: item.report_year, reverse=True), errors
 
 
-def _market_for_code(stock_code: str) -> str:
-    if stock_code.startswith("6"):
-        return "SH"
-    if stock_code.startswith(("0", "3")):
-        return "SZ"
-    if stock_code.startswith(("4", "8")):
-        return "BJ"
-    raise ValueError(f"Unsupported A-share stock code prefix: {stock_code!r}")
+def _report_year_or_none(report_period: str) -> int | None:
+    try:
+        return int(report_period[:4])
+    except ValueError:
+        return None
 
 
 def _decimal_or_none(value: Any) -> Decimal | None:
@@ -100,7 +88,10 @@ def _date_or_none(value: Any) -> date | None:
     text = _string_or_none(value)
     if text is None:
         return None
-    return date.fromisoformat(text[:10].replace("/", "-"))
+    try:
+        return date.fromisoformat(text[:10].replace("/", "-"))
+    except ValueError:
+        return None
 
 
 def _string_or_none(value: Any) -> str | None:
@@ -111,3 +102,12 @@ def _string_or_none(value: Any) -> str | None:
     if text in {"", "-", "--", "nan", "NaN", "None"}:
         return None
     return text
+
+
+def _error(stock_code: str, message: str, row: dict[str, Any]) -> SourceErrorRow:
+    return SourceErrorRow(
+        stock_code=stock_code,
+        stage=NORMALIZE_STAGE,
+        message=message,
+        raw_detail=str(row),
+    )

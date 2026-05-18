@@ -6,13 +6,14 @@ from pathlib import Path
 
 import pandas as pd  # type: ignore[import-untyped]
 
+from future_ledger.domain import StockIdentity
 from future_ledger.normalize.dividends import normalize_dividend_detail
 
 
 def test_normalize_dividend_detail_maps_required_fields_from_fixture() -> None:
     frame = pd.read_csv(Path("tests/fixtures/akshare/dividend_detail_600000.csv"))
 
-    records, errors = normalize_dividend_detail("600000", "浦发银行", frame)
+    records, errors = normalize_dividend_detail(_stock("600000", "浦发银行", "SH"), frame)
 
     assert errors == []
     assert len(records) == 2
@@ -33,21 +34,19 @@ def test_normalize_dividend_detail_maps_required_fields_from_fixture() -> None:
     assert records[0].source == "akshare.stock_fhps_detail_em"
 
 
-def test_normalize_dividend_detail_flags_duplicate_report_year() -> None:
+def test_normalize_dividend_detail_uses_stock_identity_market() -> None:
     frame = pd.DataFrame(
         [
-            {"报告期": "2024-12-31", "每10股派息": "4.0", "除权除息日": "2025-07-01"},
-            {"报告期": "2024-12-31", "每10股派息": "4.2", "除权除息日": "2025-07-02"},
+            {"报告期": "2024-12-31", "每10股派息": "4.0", "方案进度": "实施"},
         ]
     )
 
-    records, errors = normalize_dividend_detail("600000", "浦发银行", frame)
+    records, errors = normalize_dividend_detail(_stock("900001", "北交示例", "BJ"), frame)
 
+    assert errors == []
     assert len(records) == 1
-    assert len(errors) == 1
-    assert errors[0].stock_code == "600000"
-    assert errors[0].stage == "normalize"
-    assert errors[0].message == "duplicate report period"
+    assert records[0].stock_code == "900001"
+    assert records[0].market == "BJ"
 
 
 def test_normalize_dividend_detail_skips_missing_report_period() -> None:
@@ -59,11 +58,15 @@ def test_normalize_dividend_detail_skips_missing_report_period() -> None:
         ]
     )
 
-    records, errors = normalize_dividend_detail("000001", "平安银行", frame)
+    records, errors = normalize_dividend_detail(_stock("000001", "平安银行", "SZ"), frame)
 
     assert [record.report_year for record in records] == [2024]
     assert records[0].market == "SZ"
-    assert [error.message for error in errors] == [
-        "missing report period",
-        "missing report period",
+    assert [(error.stage, error.message) for error in errors] == [
+        ("dividend_normalize", "missing report period"),
+        ("dividend_normalize", "missing report period"),
     ]
+
+
+def _stock(code: str, name: str, market: str) -> StockIdentity:
+    return StockIdentity(code=code, name=name, market=market)

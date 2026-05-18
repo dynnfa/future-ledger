@@ -48,7 +48,7 @@ def normalize_dividend_detail(
         selected_rows[report_period] = (priority, index, report_year, row)
 
     records = [
-        _record_from_row(stock, report_year, report_period, row)
+        _record_from_row(stock, report_year, report_period, row, errors)
         for report_period, (_, _, report_year, row) in selected_rows.items()
     ]
     return sorted(records, key=lambda item: item.report_year, reverse=True), errors
@@ -59,8 +59,16 @@ def _record_from_row(
     report_year: int,
     report_period: str,
     row: dict[str, Any],
+    errors: list[SourceErrorRow],
 ) -> DividendRecord:
-    cash_dividend_per_10_shares = _decimal_or_none(row.get("每10股派息"))
+    cash_dividend_per_10_shares = _decimal_or_none(
+        row.get("每10股派息"),
+        field_name="cash_dividend_per_10_shares",
+        stock_code=stock.code,
+        row=row,
+        errors=errors,
+        allow_percent=False,
+    )
     return DividendRecord(
         stock_code=stock.code,
         stock_name=stock.name,
@@ -72,10 +80,38 @@ def _record_from_row(
         ex_dividend_date=_date_or_none(row.get("除权除息日")),
         registration_date=_date_or_none(row.get("股权登记日")),
         plan_status=_string_or_none(row.get("方案进度")),
-        eps=_decimal_or_none(row.get("每股收益")),
-        net_asset_per_share=_decimal_or_none(row.get("每股净资产")),
-        profit_growth_yoy_pct=_decimal_or_none(row.get("净利润同比增长")),
-        provider_yield_pct=_decimal_or_none(row.get("现金分红-股息率")),
+        eps=_decimal_or_none(
+            row.get("每股收益"),
+            field_name="eps",
+            stock_code=stock.code,
+            row=row,
+            errors=errors,
+            allow_percent=False,
+        ),
+        net_asset_per_share=_decimal_or_none(
+            row.get("每股净资产"),
+            field_name="net_asset_per_share",
+            stock_code=stock.code,
+            row=row,
+            errors=errors,
+            allow_percent=False,
+        ),
+        profit_growth_yoy_pct=_decimal_or_none(
+            row.get("净利润同比增长"),
+            field_name="profit_growth_yoy_pct",
+            stock_code=stock.code,
+            row=row,
+            errors=errors,
+            allow_percent=True,
+        ),
+        provider_yield_pct=_decimal_or_none(
+            row.get("现金分红-股息率"),
+            field_name="provider_yield_pct",
+            stock_code=stock.code,
+            row=row,
+            errors=errors,
+            allow_percent=True,
+        ),
         source=SOURCE_NAME,
     )
 
@@ -88,21 +124,42 @@ def _plan_status_priority(value: Any) -> int:
 
 
 def _report_year_or_none(report_period: str) -> int | None:
+    if len(report_period) < 4 or not report_period[:4].isdigit():
+        return None
     try:
-        return int(report_period[:4])
+        _date_or_none_required(report_period)
     except ValueError:
         return None
+    return int(report_period[:4])
 
 
-def _decimal_or_none(value: Any) -> Decimal | None:
+def _decimal_or_none(
+    value: Any,
+    *,
+    field_name: str,
+    stock_code: str,
+    row: dict[str, Any],
+    errors: list[SourceErrorRow],
+    allow_percent: bool,
+) -> Decimal | None:
     text = _string_or_none(value)
     if text is None:
         return None
 
-    normalized = text.replace(",", "").removesuffix("%").strip()
+    normalized = text.replace(",", "").strip()
+    if normalized.endswith("%"):
+        if not allow_percent:
+            errors.append(_error(stock_code, f"invalid decimal field: {field_name}", row))
+            return None
+        normalized = normalized.removesuffix("%").strip()
+    elif "%" in normalized:
+        errors.append(_error(stock_code, f"invalid decimal field: {field_name}", row))
+        return None
+
     try:
         return Decimal(normalized)
     except InvalidOperation:
+        errors.append(_error(stock_code, f"invalid decimal field: {field_name}", row))
         return None
 
 
@@ -117,9 +174,13 @@ def _date_or_none(value: Any) -> date | None:
     if text is None:
         return None
     try:
-        return date.fromisoformat(text[:10].replace("/", "-"))
+        return _date_or_none_required(text)
     except ValueError:
         return None
+
+
+def _date_or_none_required(text: str) -> date:
+    return date.fromisoformat(text[:10].replace("/", "-"))
 
 
 def _string_or_none(value: Any) -> str | None:

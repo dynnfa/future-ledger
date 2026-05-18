@@ -123,5 +123,82 @@ def test_normalize_dividend_detail_prefers_later_duplicate_when_priority_ties() 
     assert errors[0].message == "duplicate report period"
 
 
+def test_percent_fields_keep_percent_units() -> None:
+    frame = pd.DataFrame(
+        [
+            {
+                "报告期": "2024-12-31",
+                "净利润同比增长": "5.30%",
+                "现金分红-股息率": "4.00%",
+            },
+        ]
+    )
+
+    records, errors = normalize_dividend_detail(_stock("600000", "浦发银行", "SH"), frame)
+
+    assert errors == []
+    assert records[0].profit_growth_yoy_pct == Decimal("5.30")
+    assert records[0].provider_yield_pct == Decimal("4.00")
+
+
+def test_non_percent_decimal_rejects_percent_sign() -> None:
+    frame = pd.DataFrame(
+        [
+            {
+                "报告期": "2024-12-31",
+                "每10股派息": "4.20",
+                "每股收益": "2.10%",
+            },
+        ]
+    )
+
+    records, errors = normalize_dividend_detail(_stock("600000", "浦发银行", "SH"), frame)
+
+    assert len(records) == 1
+    assert records[0].cash_dividend_per_10_shares == Decimal("4.20")
+    assert records[0].eps is None
+    assert [(error.stage, error.message) for error in errors] == [
+        ("dividend_normalize", "invalid decimal field: eps"),
+    ]
+
+
+def test_invalid_report_period_is_skipped_with_source_error() -> None:
+    frame = pd.DataFrame(
+        [
+            {"报告期": "not-a-date", "每10股派息": "4.20"},
+            {"报告期": "2024-12-31", "每10股派息": "3.80"},
+        ]
+    )
+
+    records, errors = normalize_dividend_detail(_stock("600000", "浦发银行", "SH"), frame)
+
+    assert [record.report_year for record in records] == [2024]
+    assert [(error.stage, error.message) for error in errors] == [
+        ("dividend_normalize", "invalid report period"),
+    ]
+
+
+def test_malformed_optional_decimal_becomes_none_with_source_error() -> None:
+    frame = pd.DataFrame(
+        [
+            {
+                "报告期": "2024-12-31",
+                "每10股派息": "bad-value",
+                "每股净资产": "18.50",
+            },
+        ]
+    )
+
+    records, errors = normalize_dividend_detail(_stock("600000", "浦发银行", "SH"), frame)
+
+    assert len(records) == 1
+    assert records[0].cash_dividend_per_10_shares is None
+    assert records[0].cash_dividend_per_share is None
+    assert records[0].net_asset_per_share == Decimal("18.50")
+    assert [(error.stage, error.message) for error in errors] == [
+        ("dividend_normalize", "invalid decimal field: cash_dividend_per_10_shares"),
+    ]
+
+
 def _stock(code: str, name: str, market: str) -> StockIdentity:
     return StockIdentity(code=code, name=name, market=market)

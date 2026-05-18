@@ -4,7 +4,9 @@ from pathlib import Path
 import typer
 
 from future_ledger.domain import RunConfig
+from future_ledger.errors import ConfigError
 from future_ledger.pipeline import run_scan
+from future_ledger.sources.universe import SUPPORTED_UNIVERSE
 from future_ledger.workbook_writer import write_workbook
 
 app = typer.Typer(name="future-ledger", help="A-share dividend research workbook generator")
@@ -36,6 +38,27 @@ def _validate_limit(limit: int | None) -> int | None:
     return limit
 
 
+def _validate_universe(universe: str) -> str:
+    """Validate that --universe is supported before source fetching starts."""
+    if universe != SUPPORTED_UNIVERSE:
+        raise typer.BadParameter(f"Unsupported universe: {universe}")
+    return universe
+
+
+def _validate_output(output: Path) -> Path:
+    """Validate the workbook output path shape before source fetching starts."""
+    if output.suffix != ".xlsx":
+        raise typer.BadParameter("--output must end with .xlsx")
+    return output
+
+
+def _validate_cache_dir(cache_dir: Path) -> Path:
+    """Validate that an existing --cache-dir path is a directory."""
+    if cache_dir.exists() and not cache_dir.is_dir():
+        raise typer.BadParameter("--cache-dir must be a directory path")
+    return cache_dir
+
+
 @dividends_app.command("scan")
 def scan(
     years: int = typer.Option(5, "--years", help="Lookback window in years"),
@@ -54,16 +77,28 @@ def scan(
     """Scan A-share dividend data and generate a ranked workbook."""
     validated_years = _validate_years(years)
     validated_limit = _validate_limit(limit)
+    validated_universe = _validate_universe(universe)
+    validated_output = _validate_output(output)
+    validated_cache_dir = _validate_cache_dir(cache_dir)
     as_of_date = _parse_as_of(as_of)
     config = RunConfig(
         years=validated_years,
         as_of=as_of_date,
-        universe=universe,
-        output=output,
+        universe=validated_universe,
+        output=validated_output,
         limit=validated_limit,
-        cache_dir=cache_dir,
+        cache_dir=validated_cache_dir,
     )
     tables = run_scan(config)
-    written_path = write_workbook(tables, config.output)
+    try:
+        written_path = write_workbook(tables, config.output)
+    except ConfigError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+
+    universe_size = len(tables.dividend_rank)
+    processed_count = len(tables.dividend_rank)
+    typer.echo(f"Universe size: {universe_size}")
+    typer.echo(f"Processed stocks: {processed_count}")
+    typer.echo(f"Source errors: {len(tables.source_errors)}")
     typer.echo(f"Workbook written: {written_path}")
     typer.echo(f"Rows ranked: {len(tables.dividend_rank)}")

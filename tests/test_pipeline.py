@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from datetime import date
 from pathlib import Path
+from typing import Any
 
 import pandas as pd  # type: ignore[import-untyped]
 import pytest
 
-from future_ledger.cache import cache_key, read_cache, read_metadata, write_cache
+from future_ledger.cache import cache_key, read_cache, read_metadata, write_cache, write_metadata
 from future_ledger.domain import RunConfig, SourceErrorRow, SourceFetchResult, SourceMetadata
 from future_ledger.pipeline import run_scan
 
@@ -195,6 +196,86 @@ def test_run_scan_does_not_overwrite_cache_for_failed_live_fetch(
         error.stock_code == "600000"
         and error.stage == "dividend_fetch"
         and error.message == "RuntimeError: upstream unavailable"
+        for error in tables.source_errors
+    )
+
+
+def test_run_scan_restores_existing_cache_when_metadata_write_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cache_dir = tmp_path / "cache"
+    dividend_key = cache_key("dividend_detail", "600000")
+    write_cache(
+        cache_dir,
+        dividend_key,
+        pd.DataFrame([{"代码": "600000", "分红年度": "existing"}]),
+    )
+    write_metadata(
+        cache_dir,
+        dividend_key,
+        SourceMetadata(
+            source_name="akshare",
+            stage="dividend_fetch",
+            symbol="600000",
+            fetched_at="2026-05-14T08:30:00+00:00",
+            akshare_version="1.17.0",
+            row_count=1,
+            upstream_function="stock_fhps_detail_em",
+        ),
+        empty=False,
+    )
+
+    spot_frame = pd.DataFrame([{"代码": "600000", "名称": "浦发银行"}])
+    monkeypatch.setattr(
+        "future_ledger.pipeline.fetch_a_share_spot",
+        lambda: _result(spot_frame, "spot_fetch", "all_a", "stock_zh_a_spot_em"),
+    )
+    monkeypatch.setattr(
+        "future_ledger.pipeline.fetch_dividend_detail",
+        lambda symbol: _result(
+            pd.DataFrame([{"代码": symbol, "分红年度": "new"}]),
+            "dividend_fetch",
+            symbol,
+            "stock_fhps_detail_em",
+        ),
+    )
+    monkeypatch.setattr(
+        "future_ledger.pipeline.fetch_price_history",
+        lambda symbol, start_date, end_date: _result(
+            pd.DataFrame([{"日期": "2026-04-17", "收盘": "10.25"}]),
+            "price_fetch",
+            symbol,
+            "stock_zh_a_hist",
+            request_start_date=start_date,
+            request_end_date=end_date,
+        ),
+    )
+
+    original_write_text = Path.write_text
+
+    def flaky_write_text(self: Path, data: str, *args: Any, **kwargs: Any) -> int:
+        if self.parent.name == "dividend_detail" and "600000.metadata.json" in self.name:
+            raise OSError("metadata disk full")
+        return original_write_text(self, data, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "write_text", flaky_write_text)
+
+    tables = run_scan(_config(tmp_path))
+
+    cached_dividend = read_cache(cache_dir, dividend_key)
+    assert cached_dividend is not None
+    assert cached_dividend.to_dict(orient="records") == [
+        {"代码": "600000", "分红年度": "existing"}
+    ]
+
+    metadata = read_metadata(cache_dir, dividend_key)
+    assert metadata is not None
+    assert metadata["row_count"] == 1
+    assert any(
+        error.stock_code == "600000"
+        and error.stage == "cache_write"
+        and "OSError: metadata disk full" in error.message
         for error in tables.source_errors
     )
 

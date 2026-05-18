@@ -75,6 +75,27 @@ def test_write_and_read_cache_round_trips_dataframe(tmp_path: Path) -> None:
     ]
 
 
+def test_read_cache_preserves_na_like_literal_strings(tmp_path: Path) -> None:
+    frame = pd.DataFrame(
+        [
+            {"代码": "600000", "备注": "NA"},
+            {"代码": "000001", "备注": "null"},
+            {"代码": "000002", "备注": ""},
+        ]
+    )
+    key = cache_key("spot", "all_a")
+
+    write_cache(tmp_path, key, frame)
+    cached = read_cache(tmp_path, key)
+
+    assert cached is not None
+    assert cached.to_dict(orient="records") == [
+        {"代码": "600000", "备注": "NA"},
+        {"代码": "000001", "备注": "null"},
+        {"代码": "000002", "备注": ""},
+    ]
+
+
 def test_write_cache_creates_parent_directories(tmp_path: Path) -> None:
     frame = pd.DataFrame([{"代码": "600000", "分红年度": "2025"}])
     key = cache_key("dividend_detail", "600000")

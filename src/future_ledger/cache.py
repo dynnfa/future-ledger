@@ -55,7 +55,7 @@ def read_cache(cache_dir: Path, key: str) -> pd.DataFrame | None:
         return None
 
     try:
-        return pd.read_csv(path, encoding="utf-8", dtype=str)
+        return pd.read_csv(path, encoding="utf-8", dtype=str, keep_default_na=False)
     except Exception as exc:
         raise SourceError(
             f"failed to read cache snapshot: {key}",
@@ -69,6 +69,12 @@ def write_cache(cache_dir: Path, key: str, df: pd.DataFrame) -> None:
     path = _cache_path(cache_dir, key)
     path.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(path, index=False, encoding="utf-8")
+
+
+def cache_snapshot_paths(cache_dir: Path, key: str) -> tuple[Path, Path]:
+    """Return validated CSV and metadata paths for one cache snapshot."""
+    cache_path = _cache_path(cache_dir, key)
+    return cache_path, cache_path.with_suffix(".metadata.json")
 
 
 def read_metadata(cache_dir: Path, key: str) -> dict[str, Any] | None:
@@ -150,7 +156,7 @@ def _cache_path(cache_dir: Path, key: str) -> Path:
 
 
 def _metadata_path(cache_dir: Path, key: str) -> Path:
-    return _cache_path(cache_dir, key).with_suffix(".metadata.json")
+    return cache_snapshot_paths(cache_dir, key)[1]
 
 
 def _metadata_payload(metadata: SourceMetadata, *, empty: bool | None) -> dict[str, Any]:

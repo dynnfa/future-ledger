@@ -8,8 +8,9 @@ this module with normalization, metrics, report assembly, and workbook output.
 from __future__ import annotations
 
 from datetime import date
+from pathlib import Path
 
-from future_ledger.cache import cache_key, write_cache, write_metadata
+from future_ledger.cache import cache_key, cache_snapshot_paths, write_cache, write_metadata
 from future_ledger.domain import (
     MetadataRow,
     ReportTables,
@@ -96,19 +97,48 @@ def _write_raw_cache_snapshot(
     if not _is_cacheable(result):
         return []
 
+    cache_path, metadata_path = cache_snapshot_paths(config.cache_dir, key)
+    try:
+        original_cache = _read_existing_bytes(cache_path)
+        original_metadata = _read_existing_bytes(metadata_path)
+    except OSError as exc:
+        return [_cache_write_error(result, key, exc)]
+
     try:
         write_cache(config.cache_dir, key, result.frame)
         write_metadata(config.cache_dir, key, result.metadata, empty=result.frame.empty)
     except OSError as exc:
-        return [
-            SourceErrorRow(
-                stock_code=result.metadata.symbol,
-                stage="cache_write",
-                message=f"{exc.__class__.__name__}: {exc}",
-                raw_detail=key,
-            )
-        ]
+        _restore_cache_file(cache_path, original_cache)
+        _restore_cache_file(metadata_path, original_metadata)
+        return [_cache_write_error(result, key, exc)]
     return []
+
+
+def _read_existing_bytes(path: Path) -> bytes | None:
+    if not path.exists():
+        return None
+    return path.read_bytes()
+
+
+def _restore_cache_file(path: Path, content: bytes | None) -> None:
+    try:
+        if content is None:
+            path.unlink(missing_ok=True)
+            return
+
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content)
+    except OSError:
+        return
+
+
+def _cache_write_error(result: SourceFetchResult, key: str, exc: OSError) -> SourceErrorRow:
+    return SourceErrorRow(
+        stock_code=result.metadata.symbol,
+        stage="cache_write",
+        message=f"{exc.__class__.__name__}: {exc}",
+        raw_detail=key,
+    )
 
 
 def _is_cacheable(result: SourceFetchResult) -> bool:

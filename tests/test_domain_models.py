@@ -136,6 +136,72 @@ class TestDividendRankRow:
         assert row.annual_fields["2025_plan_status"] == "实施"
         assert row.rank_latest_yield == 1
 
+    def test_annual_fields_cannot_be_mutated_through_caller_owned_dict(self) -> None:
+        annual_fields: dict[str, object] = {"2025_plan_status": "实施"}
+        row = DividendRankRow(
+            rank_latest_yield=1,
+            stock_code="600000",
+            stock_name="浦发银行",
+            market="SH",
+            latest_report_year=2025,
+            latest_cash_dividend_per_10_shares=Decimal("4.10"),
+            latest_cash_dividend_per_share=Decimal("0.41"),
+            reference_price=Decimal("10.25"),
+            reference_price_date=date(2025, 7, 1),
+            latest_dividend_yield_pct=Decimal("4.00"),
+            dividend_yield_source="calculated_ex_dividend_close",
+            dividend_year_count_5y=5,
+            continuous_dividend_5y=True,
+            avg_dividend_yield_pct_5y=Decimal("3.80"),
+            min_dividend_yield_pct_5y=Decimal("3.10"),
+            max_dividend_yield_pct_5y=Decimal("4.20"),
+            as_of_date=date(2026, 4, 20),
+            cash_dividends_1y=Decimal("0.41"),
+            total_return_1y_pct=Decimal("6.50"),
+            annualized_return_1y_pct=Decimal("6.50"),
+            has_missing_years_5y=False,
+            data_quality_flags=(),
+            source_priority_used="akshare.stock_fhps_detail_em",
+            fetched_at="2026-04-20T08:30:00+08:00",
+            annual_fields=annual_fields,
+        )
+
+        annual_fields["2025_plan_status"] = "已篡改"
+
+        assert row.annual_fields["2025_plan_status"] == "实施"
+
+    def test_annual_fields_mapping_rejects_direct_item_assignment(self) -> None:
+        row = DividendRankRow(
+            rank_latest_yield=None,
+            stock_code="000001",
+            stock_name="平安银行",
+            market="SZ",
+            latest_report_year=None,
+            latest_cash_dividend_per_10_shares=None,
+            latest_cash_dividend_per_share=None,
+            reference_price=None,
+            reference_price_date=None,
+            latest_dividend_yield_pct=None,
+            dividend_yield_source="",
+            dividend_year_count_5y=0,
+            continuous_dividend_5y=False,
+            avg_dividend_yield_pct_5y=None,
+            min_dividend_yield_pct_5y=None,
+            max_dividend_yield_pct_5y=None,
+            as_of_date=date(2026, 4, 20),
+            cash_dividends_1y=None,
+            total_return_1y_pct=None,
+            annualized_return_1y_pct=None,
+            has_missing_years_5y=True,
+            data_quality_flags=("no_valid_dividend_records",),
+            source_priority_used="akshare.stock_fhps_detail_em",
+            fetched_at="2026-04-20T08:30:00+08:00",
+            annual_fields={},
+        )
+
+        with pytest.raises(TypeError):
+            row.annual_fields["2025_plan_status"] = "实施"  # type: ignore[index]
+
     def test_optional_rank_is_none(self) -> None:
         row = DividendRankRow(
             rank_latest_yield=None,

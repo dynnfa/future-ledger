@@ -7,10 +7,12 @@ here.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
+from types import MappingProxyType
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -116,7 +118,14 @@ class DividendRankRow:
     data_quality_flags: tuple[str, ...]
     source_priority_used: str
     fetched_at: str
-    annual_fields: dict[str, object]
+    annual_fields: Mapping[str, object]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "annual_fields",
+            MappingProxyType(dict(self.annual_fields)),
+        )
 
 
 @dataclass(frozen=True)

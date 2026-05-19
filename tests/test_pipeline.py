@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
 import pandas as pd  # type: ignore[import-untyped]
 import pytest
+from openpyxl import load_workbook  # type: ignore[import-untyped]
 
 from future_ledger.cache import cache_key, read_cache, read_metadata, write_cache, write_metadata
 from future_ledger.domain import (
@@ -20,6 +21,7 @@ from future_ledger.domain import (
     StockIdentity,
 )
 from future_ledger.pipeline import run_scan
+from future_ledger.workbook_writer import write_workbook
 
 
 def test_run_scan_writes_raw_cache_snapshots_for_successful_fetches(
@@ -542,6 +544,134 @@ def test_run_scan_continues_after_per_stock_source_error(
         for row in tables.source_errors
     )
     assert any(row.stock_code == "000001" for row in tables.dividend_rank)
+
+
+def test_pipeline_fixture_integration_writes_expected_report_tables(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture_root = Path("tests/fixtures")
+    spot_frame = pd.read_csv(
+        fixture_root / "akshare" / "spot_a_share.csv",
+        dtype={"代码": str},
+    )
+    dividend_frame = pd.read_csv(fixture_root / "akshare" / "dividend_detail_600000.csv")
+    price_frame = pd.read_csv(
+        fixture_root / "prices" / "600000_daily_20250630_20260417.csv"
+    )
+
+    monkeypatch.setattr(
+        "future_ledger.pipeline.fetch_a_share_spot",
+        lambda: _result(spot_frame, "spot_fetch", "all_a", "stock_zh_a_spot_em"),
+    )
+    monkeypatch.setattr(
+        "future_ledger.pipeline.fetch_dividend_detail",
+        lambda symbol: _result(
+            dividend_frame,
+            "dividend_fetch",
+            symbol,
+            "stock_fhps_detail_em",
+        ),
+    )
+    monkeypatch.setattr(
+        "future_ledger.pipeline.fetch_price_history",
+        lambda symbol, start_date, end_date: _result(
+            price_frame,
+            "price_fetch",
+            symbol,
+            "stock_zh_a_hist",
+            request_start_date=start_date,
+            request_end_date=end_date,
+        ),
+    )
+
+    config = RunConfig(
+        years=2,
+        as_of=date(2026, 4, 17),
+        universe="all-a-excluding-st",
+        output=tmp_path / "fixture-report.xlsx",
+        limit=1,
+        cache_dir=tmp_path / "cache",
+    )
+
+    tables = run_scan(config)
+    output = write_workbook(
+        tables,
+        config.output,
+        workbook_timestamp=datetime(2026, 5, 14, 8, 30, 0),
+    )
+
+    workbook = load_workbook(output)
+    rank_sheet = workbook["dividend_rank"]
+    long_sheet = workbook["dividend_long"]
+    price_sheet = workbook["price_points"]
+    error_sheet = workbook["source_errors"]
+    metadata_sheet = workbook["metadata"]
+
+    assert tables.source_errors == []
+    assert len(tables.dividend_rank) == 1
+    assert tables.dividend_rank[0].stock_code == "600000"
+    assert tables.dividend_rank[0].latest_dividend_yield_pct == Decimal("3.80")
+    assert tables.dividend_rank[0].cash_dividends_1y == Decimal("0.38")
+    assert tables.dividend_rank[0].total_return_1y_pct == Decimal("11.80")
+    assert tables.dividend_rank[0].data_quality_flags == ()
+
+    assert workbook.sheetnames == [
+        "dividend_rank",
+        "dividend_long",
+        "price_points",
+        "source_errors",
+        "metadata",
+    ]
+    assert [cell.value for cell in rank_sheet[1]][:24] == [
+        "rank_latest_yield",
+        "stock_code",
+        "stock_name",
+        "market",
+        "latest_report_year",
+        "latest_cash_dividend_per_10_shares",
+        "latest_cash_dividend_per_share",
+        "reference_price",
+        "reference_price_date",
+        "latest_dividend_yield_pct",
+        "dividend_yield_source",
+        "dividend_year_count_5y",
+        "continuous_dividend_5y",
+        "avg_dividend_yield_pct_5y",
+        "min_dividend_yield_pct_5y",
+        "max_dividend_yield_pct_5y",
+        "as_of_date",
+        "cash_dividends_1y",
+        "total_return_1y_pct",
+        "annualized_return_1y_pct",
+        "has_missing_years_5y",
+        "data_quality_flags",
+        "source_priority_used",
+        "fetched_at",
+    ]
+    assert rank_sheet["A2"].value == 1
+    assert rank_sheet["B2"].value == "600000"
+    assert rank_sheet["C2"].value == "浦发银行"
+    assert rank_sheet["J2"].value == 3.8
+    assert rank_sheet["R2"].value == 0.38
+    assert rank_sheet["S2"].value == 11.8
+    assert rank_sheet["U2"].value is False
+    assert rank_sheet["V2"].value is None
+    assert long_sheet.max_row == 3
+    assert price_sheet.max_row == 3
+    assert error_sheet.max_row == 1
+
+    metadata = {
+        metadata_sheet.cell(row=index, column=1).value: metadata_sheet.cell(
+            row=index,
+            column=2,
+        ).value
+        for index in range(2, metadata_sheet.max_row + 1)
+    }
+    assert metadata["years"] == "2"
+    assert metadata["as_of"] == "2026-04-17"
+    assert metadata["source.price_fetch.600000.request_start_date"] == "20240417"
+    assert metadata["source.price_fetch.600000.request_end_date"] == "20260417"
 
 
 def _config(tmp_path: Path) -> RunConfig:

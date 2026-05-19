@@ -1,15 +1,18 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
 import pandas as pd  # type: ignore[import-untyped]
 import pytest
+from openpyxl import load_workbook  # type: ignore[import-untyped]
 
 from future_ledger.cache import cache_key, read_cache, read_metadata, write_cache, write_metadata
 from future_ledger.domain import RunConfig, SourceErrorRow, SourceFetchResult, SourceMetadata
 from future_ledger.pipeline import run_scan
+from future_ledger.workbook_writer import write_workbook
 
 
 def test_run_scan_writes_raw_cache_snapshots_for_successful_fetches(
@@ -17,7 +20,21 @@ def test_run_scan_writes_raw_cache_snapshots_for_successful_fetches(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     spot_frame = pd.DataFrame([{"代码": "600000", "名称": "浦发银行"}])
-    dividend_frame = pd.DataFrame([{"代码": "600000", "分红年度": "2025"}])
+    dividend_frame = pd.DataFrame(
+        [
+            {
+                "报告期": "2025-12-31",
+                "每10股派息": "4.10",
+                "除权除息日": "2026-07-01",
+                "股权登记日": "2026-06-30",
+                "方案进度": "实施",
+                "每股收益": "2.10",
+                "每股净资产": "18.50",
+                "净利润同比增长": "5.30",
+                "现金分红-股息率": "4.00",
+            }
+        ]
+    )
     price_frame = pd.DataFrame([{"日期": "2026-04-17", "收盘": "10.25"}])
 
     monkeypatch.setattr(
@@ -59,7 +76,17 @@ def test_run_scan_writes_raw_cache_snapshots_for_successful_fetches(
     cached_dividend = read_cache(tmp_path / "cache", dividend_key)
     assert cached_dividend is not None
     assert cached_dividend.astype(str).to_dict(orient="records") == [
-        {"代码": "600000", "分红年度": "2025"}
+        {
+            "报告期": "2025-12-31",
+            "每10股派息": "4.10",
+            "除权除息日": "2026-07-01",
+            "股权登记日": "2026-06-30",
+            "方案进度": "实施",
+            "每股收益": "2.10",
+            "每股净资产": "18.50",
+            "净利润同比增长": "5.30",
+            "现金分红-股息率": "4.00",
+        }
     ]
 
     price_key = cache_key(
@@ -80,6 +107,93 @@ def test_run_scan_writes_raw_cache_snapshots_for_successful_fetches(
     assert price_metadata["request_start_date"] == "20250420"
     assert price_metadata["request_end_date"] == "20260420"
     assert price_metadata["empty"] is False
+
+
+def test_pipeline_fixture_integration_writes_expected_report_tables(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    spot_frame = pd.read_csv(Path("tests/fixtures/akshare/spot_a_share.csv"))
+    dividend_frame = pd.read_csv(Path("tests/fixtures/akshare/dividend_detail_600000.csv"))
+    price_frame = pd.read_csv(Path("tests/fixtures/prices/600000_daily_20250630_20260417.csv"))
+
+    monkeypatch.setattr(
+        "future_ledger.pipeline.fetch_a_share_spot",
+        lambda: _result(spot_frame, "spot_fetch", "all_a", "stock_zh_a_spot_em"),
+    )
+    monkeypatch.setattr(
+        "future_ledger.pipeline.fetch_dividend_detail",
+        lambda symbol: _result(
+            dividend_frame,
+            "dividend_fetch",
+            symbol,
+            "stock_fhps_detail_em",
+        ),
+    )
+    monkeypatch.setattr(
+        "future_ledger.pipeline.fetch_price_history",
+        lambda symbol, start_date, end_date: _result(
+            price_frame,
+            "price_fetch",
+            symbol,
+            "stock_zh_a_hist",
+            request_start_date=start_date,
+            request_end_date=end_date,
+        ),
+    )
+
+    config = RunConfig(
+        years=2,
+        as_of=date(2026, 4, 17),
+        universe="all-a-excluding-st",
+        output=tmp_path / "report.xlsx",
+        limit=1,
+        cache_dir=tmp_path / "cache",
+    )
+
+    tables = run_scan(config)
+    output = write_workbook(
+        tables,
+        config.output,
+        workbook_timestamp=datetime(2026, 5, 14, 8, 30, 0),
+    )
+
+    assert tables.source_errors == []
+    assert len(tables.dividend_rank) == 1
+    rank_row = tables.dividend_rank[0]
+    assert rank_row.stock_code == "600000"
+    assert rank_row.stock_name == "浦发银行"
+    assert rank_row.latest_report_year == 2025
+    assert rank_row.latest_cash_dividend_per_share == Decimal("0.41")
+    assert rank_row.reference_price == Decimal("10.80")
+    assert rank_row.reference_price_date == date(2026, 4, 17)
+    assert rank_row.latest_dividend_yield_pct == Decimal("3.80")
+    assert rank_row.dividend_year_count_5y == 2
+    assert rank_row.continuous_dividend_5y is True
+    assert rank_row.data_quality_flags == ()
+
+    assert [row.report_year for row in tables.dividend_long] == [2025, 2024]
+    assert [(point.stock_code, point.date) for point in tables.price_points] == [
+        ("600000", date(2025, 6, 30)),
+        ("600000", date(2026, 4, 17)),
+    ]
+
+    workbook = load_workbook(output)
+    assert workbook.sheetnames == [
+        "dividend_rank",
+        "dividend_long",
+        "price_points",
+        "source_errors",
+        "metadata",
+    ]
+    rank_sheet = workbook["dividend_rank"]
+    assert rank_sheet["B2"].value == "600000"
+    assert rank_sheet["C2"].value == "浦发银行"
+    assert rank_sheet["F2"].value == 4.1
+    assert rank_sheet["J2"].value == 3.8
+    assert workbook["dividend_long"].max_row == 3
+    assert workbook["price_points"].max_row == 3
+    assert workbook["source_errors"].max_row == 1
 
 
 def test_run_scan_records_cache_write_error_and_continues_per_stock(

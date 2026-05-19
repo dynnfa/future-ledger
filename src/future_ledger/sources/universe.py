@@ -6,6 +6,7 @@ import pandas as pd  # type: ignore[import-untyped]
 
 from future_ledger.domain import SourceErrorRow, StockIdentity
 from future_ledger.errors import SourceError
+from future_ledger.normalize._util import string_or_none
 
 REQUIRED_COLUMNS = ("代码", "名称")
 SUPPORTED_UNIVERSE = "all-a-excluding-st"
@@ -46,7 +47,7 @@ def build_universe(
             errors.append(_universe_error(code, "invalid stock code length", raw_detail))
             continue
 
-        name = _string_or_none(row.get("名称"))
+        name = string_or_none(row.get("名称"))
         if name is None:
             errors.append(_universe_error(code, "missing stock name", raw_detail))
             continue
@@ -98,16 +99,6 @@ def _normalize_code(value: Any) -> str | None:
         return None
     if len(text) <= 6:
         return text.zfill(6)
-    return text
-
-
-def _string_or_none(value: Any) -> str | None:
-    if value is None or pd.isna(value):
-        return None
-
-    text = str(value).strip()
-    if text in {"", "-", "--", "nan", "NaN", "None"}:
-        return None
     return text
 
 

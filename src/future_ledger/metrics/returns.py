@@ -4,9 +4,8 @@ from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 
-from future_ledger.domain import DividendRecord, PricePoint
-
-PERCENT_QUANT = Decimal("0.01")
+from future_ledger.domain import DividendRecord, PricePoint, safe_replace_year
+from future_ledger.metrics import PERCENT_QUANT, last_price_on_or_before
 
 
 @dataclass(frozen=True)
@@ -30,10 +29,10 @@ def calculate_trailing_one_year_return(
     prices: list[PricePoint],
     dividends: list[DividendRecord],
 ) -> ReturnCalculationResult:
-    window_start = _one_year_window_start(as_of)
+    window_start = safe_replace_year(as_of, as_of.year - 1)
     stock_prices = [point for point in prices if point.stock_code == stock_code]
     start_point = _first_on_or_after(stock_prices, window_start)
-    end_point = _last_on_or_before(stock_prices, as_of)
+    end_point = last_price_on_or_before(stock_prices, as_of)
 
     if start_point is None or end_point is None:
         return _empty_result(as_of, window_start, "missing_return_price")
@@ -67,15 +66,6 @@ def calculate_trailing_one_year_return(
     )
 
 
-def _one_year_window_start(as_of: date) -> date:
-    try:
-        return date(as_of.year - 1, as_of.month, as_of.day)
-    except ValueError:
-        if as_of.month == 2 and as_of.day == 29:
-            return date(as_of.year - 1, 2, 28)
-        raise
-
-
 def _empty_result(as_of: date, window_start: date, flag: str) -> ReturnCalculationResult:
     return ReturnCalculationResult(
         as_of_date=as_of,
@@ -97,15 +87,6 @@ def _first_on_or_after(points: list[PricePoint], target_date: date) -> PricePoin
         if point.date >= target_date:
             return point
     return None
-
-
-def _last_on_or_before(points: list[PricePoint], target_date: date) -> PricePoint | None:
-    selected: PricePoint | None = None
-    for point in points:
-        if point.date > target_date:
-            break
-        selected = point
-    return selected
 
 
 def _cash_dividends_in_window(

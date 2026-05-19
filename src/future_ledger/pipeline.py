@@ -14,6 +14,7 @@ from future_ledger.domain import (
     SourceErrorRow,
     SourceFetchResult,
     SourceMetadata,
+    safe_replace_year,
 )
 from future_ledger.metrics.dividend_yield import (
     DIVIDEND_YIELD_SOURCE,
@@ -224,15 +225,8 @@ def _source_errors_from_result(result: SourceFetchResult) -> list[SourceErrorRow
 
 
 def _price_window(as_of: date, years: int) -> tuple[str, str]:
-    start = _replace_year_with_feb_28_fallback(as_of, as_of.year - years)
+    start = safe_replace_year(as_of, as_of.year - years)
     return _yyyymmdd(start), _yyyymmdd(as_of)
-
-
-def _replace_year_with_feb_28_fallback(value: date, year: int) -> date:
-    try:
-        return value.replace(year=year)
-    except ValueError:
-        return value.replace(year=year, day=28)
 
 
 def _yyyymmdd(value: date) -> str:

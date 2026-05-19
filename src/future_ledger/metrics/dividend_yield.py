@@ -6,10 +6,10 @@ from decimal import Decimal
 from typing import cast
 
 from future_ledger.domain import PricePoint
+from future_ledger.metrics import PERCENT_QUANT, last_price_on_or_before
 
 REFERENCE_PRICE_RULE = "ex_dividend_close_or_previous_trading_day"
 DIVIDEND_YIELD_SOURCE = "calculated_ex_dividend_close"
-PERCENT_QUANT = Decimal("0.01")
 
 
 @dataclass(frozen=True)
@@ -32,11 +32,7 @@ def resolve_reference_price(
     if ex_dividend_date is None:
         return ReferencePriceResult(None, None, REFERENCE_PRICE_RULE, False)
 
-    selected: PricePoint | None = None
-    for point in points:
-        if point.date > ex_dividend_date:
-            break
-        selected = point
+    selected = last_price_on_or_before(points, ex_dividend_date)
 
     if selected is None:
         return ReferencePriceResult(None, None, REFERENCE_PRICE_RULE, False)

@@ -364,14 +364,37 @@ def test_run_scan_sequences_source_cache_normalize_metrics_and_assembly(
         close=Decimal("10.00"),
     )
 
+    def fake_build_universe(
+        frame: pd.DataFrame,
+        universe: str,
+        limit: int | None,
+    ) -> tuple[list[StockIdentity], list[SourceErrorRow]]:
+        stages.append("build_universe")
+        return [stock], []
+
+    def fake_write_cache(cache_dir: Path, key: str, frame: pd.DataFrame) -> None:
+        stages.append(f"cache:{key.split('/')[0]}")
+
+    def fake_normalize_dividend_detail(
+        received_stock: StockIdentity,
+        frame: pd.DataFrame,
+    ) -> tuple[list[DividendRecord], list[SourceErrorRow]]:
+        stages.append("normalize_dividend")
+        return [dividend_record], []
+
+    def fake_normalize_price_history(
+        stock_code: str,
+        frame: pd.DataFrame,
+        metadata: SourceMetadata,
+    ) -> tuple[list[PricePoint], list[SourceErrorRow]]:
+        stages.append("normalize_price")
+        return [price_point], []
+
     monkeypatch.setattr(
         "future_ledger.pipeline.fetch_a_share_spot",
         lambda: _stage_result(stages, "fetch_spot", "spot_fetch", "all_a"),
     )
-    monkeypatch.setattr(
-        "future_ledger.pipeline.build_universe",
-        lambda frame, universe, limit: (stages.append("build_universe") or [stock], []),
-    )
+    monkeypatch.setattr("future_ledger.pipeline.build_universe", fake_build_universe)
     monkeypatch.setattr(
         "future_ledger.pipeline.fetch_dividend_detail",
         lambda symbol: _stage_result(stages, "fetch_dividend", "dividend_fetch", symbol),
@@ -387,27 +410,18 @@ def test_run_scan_sequences_source_cache_normalize_metrics_and_assembly(
             request_end_date=end_date,
         ),
     )
-    monkeypatch.setattr(
-        "future_ledger.pipeline.write_cache",
-        lambda cache_dir, key, frame: stages.append(f"cache:{key.split('/')[0]}"),
-    )
+    monkeypatch.setattr("future_ledger.pipeline.write_cache", fake_write_cache)
     monkeypatch.setattr(
         "future_ledger.pipeline.write_metadata",
         lambda cache_dir, key, metadata, empty: None,
     )
     monkeypatch.setattr(
         "future_ledger.pipeline.normalize_dividend_detail",
-        lambda received_stock, frame: (
-            stages.append("normalize_dividend") or [dividend_record],
-            [],
-        ),
+        fake_normalize_dividend_detail,
     )
     monkeypatch.setattr(
         "future_ledger.pipeline.normalize_price_history",
-        lambda stock_code, frame, metadata: (
-            stages.append("normalize_price") or [price_point],
-            [],
-        ),
+        fake_normalize_price_history,
     )
     monkeypatch.setattr(
         "future_ledger.pipeline.resolve_reference_price",

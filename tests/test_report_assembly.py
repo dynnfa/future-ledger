@@ -257,6 +257,78 @@ def test_assemble_report_tables_carries_source_errors_metadata_and_used_prices()
     assert metadata["source.dividend_fetch.600000.row_count"] == "3"
 
 
+def test_assemble_report_tables_orders_required_data_quality_flags_from_inputs() -> None:
+    stock = _stock("600000", "浦发银行", "SH")
+    dividend = DividendRecord(
+        stock_code="600000",
+        stock_name="浦发银行",
+        market="SH",
+        report_year=2025,
+        report_period="2025-12-31",
+        cash_dividend_per_10_shares=None,
+        cash_dividend_per_share=None,
+        ex_dividend_date=None,
+        registration_date=None,
+        plan_status="实施",
+        eps=None,
+        net_asset_per_share=None,
+        profit_growth_yoy_pct=None,
+        provider_yield_pct=None,
+        source="akshare.stock_fhps_detail_em",
+    )
+    duplicate_error = SourceErrorRow(
+        stock_code="600000",
+        stage="dividend_normalize",
+        message="duplicate report period",
+        raw_detail="kept implemented row",
+    )
+
+    tables = assemble_report_tables(
+        config=_config(),
+        stocks=[stock],
+        dividends=[dividend],
+        prices=[],
+        dividend_metrics=[
+            _dividend_metric(
+                "600000",
+                2025,
+                None,
+                None,
+                flags=("missing_reference_price",),
+            )
+        ],
+        return_metrics=[
+            ReturnMetricInput(
+                stock_code="600000",
+                start_price_date=None,
+                end_price_date=None,
+                cash_dividends_1y=None,
+                total_return_1y_pct=None,
+                annualized_return_1y_pct=None,
+                data_quality_flags=(
+                    "missing_return_price",
+                    "uncertain_dividend_window",
+                    "invalid_return_start_price",
+                ),
+            )
+        ],
+        source_errors=[duplicate_error],
+        source_metadata=[],
+        generated_at="2026-04-20T08:30:00+08:00",
+    )
+
+    assert tables.dividend_rank[0].data_quality_flags == (
+        "has_missing_years_5y",
+        "missing_cash_dividend",
+        "missing_ex_dividend_date",
+        "missing_reference_price",
+        "missing_return_price",
+        "uncertain_dividend_window",
+        "invalid_return_start_price",
+        "duplicate_report_period",
+    )
+
+
 def _config(years: int = 5, limit: int | None = None) -> RunConfig:
     return RunConfig(
         years=years,

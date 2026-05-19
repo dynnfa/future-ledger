@@ -257,6 +257,101 @@ def test_assemble_report_tables_carries_source_errors_metadata_and_used_prices()
     assert metadata["source.dividend_fetch.600000.row_count"] == "3"
 
 
+def test_assemble_report_tables_covers_required_data_quality_flags() -> None:
+    stocks = [
+        _stock("600000", "浦发银行", "SH"),
+        _stock("000001", "平安银行", "SZ"),
+    ]
+    dividends = [
+        DividendRecord(
+            stock_code="000001",
+            stock_name="平安银行",
+            market="SZ",
+            report_year=2025,
+            report_period="2025-12-31",
+            cash_dividend_per_10_shares=None,
+            cash_dividend_per_share=None,
+            ex_dividend_date=None,
+            registration_date=None,
+            plan_status="实施",
+            eps=None,
+            net_asset_per_share=None,
+            profit_growth_yoy_pct=None,
+            provider_yield_pct=None,
+            source="akshare.stock_fhps_detail_em",
+        )
+    ]
+    source_errors = [
+        SourceErrorRow(
+            stock_code="600000",
+            stage="dividend_fetch",
+            message="empty upstream frame",
+            raw_detail=None,
+        ),
+        SourceErrorRow(
+            stock_code="000001",
+            stage="dividend_normalize",
+            message="duplicate report period",
+            raw_detail="{'报告期': '2025-12-31'}",
+        ),
+    ]
+
+    tables = assemble_report_tables(
+        config=_config(),
+        stocks=stocks,
+        dividends=dividends,
+        prices=[],
+        dividend_metrics=[
+            DividendMetricInput(
+                stock_code="000001",
+                report_period="2025-12-31",
+                reference_price=None,
+                reference_price_date=None,
+                dividend_yield_pct=None,
+                dividend_yield_source="calculated_ex_dividend_close",
+                data_quality_flags=("missing_reference_price",),
+            )
+        ],
+        return_metrics=[
+            ReturnMetricInput(
+                stock_code="000001",
+                start_price_date=None,
+                end_price_date=None,
+                cash_dividends_1y=None,
+                total_return_1y_pct=None,
+                annualized_return_1y_pct=None,
+                data_quality_flags=(
+                    "missing_return_price",
+                    "uncertain_dividend_window",
+                    "invalid_return_start_price",
+                ),
+            )
+        ],
+        source_errors=source_errors,
+        source_metadata=[_source_metadata("600000"), _source_metadata("000001")],
+        generated_at="2026-04-20T08:30:00+08:00",
+    )
+
+    observed_flags = {
+        flag
+        for row in tables.dividend_rank
+        for flag in row.data_quality_flags
+    }
+
+    assert observed_flags >= {
+        "no_valid_dividend_records",
+        "has_missing_years_5y",
+        "missing_cash_dividend",
+        "missing_ex_dividend_date",
+        "missing_reference_price",
+        "missing_return_price",
+        "uncertain_dividend_window",
+        "invalid_return_start_price",
+        "duplicate_report_period",
+        "empty_dividend_detail",
+    }
+
+
 def _config(years: int = 5, limit: int | None = None) -> RunConfig:
     return RunConfig(
         years=years,

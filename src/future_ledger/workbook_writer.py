@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Sequence
-from datetime import date, datetime
+from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -214,10 +214,6 @@ def _excel_value(value: object) -> object:
         return None
     if isinstance(value, tuple):
         return "|".join(str(item) for item in value)
-    if isinstance(value, Decimal):
-        return value
-    if isinstance(value, date):
-        return value
     return value
 
 

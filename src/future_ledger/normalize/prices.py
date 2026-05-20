@@ -85,6 +85,8 @@ def _parse_close(value: Any) -> tuple[Decimal | None, str | None]:
 
 
 def _string_or_none(value: Any) -> str | None:
+    # Keep price parsing stricter than the shared helper: literal "NaN" should
+    # be reported as invalid input, not missing data.
     if value is None or pd.isna(value):
         return None
 

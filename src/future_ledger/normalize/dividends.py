@@ -7,6 +7,7 @@ from typing import Any
 import pandas as pd  # type: ignore[import-untyped]
 
 from future_ledger.domain import DividendRecord, SourceErrorRow, StockIdentity
+from future_ledger.normalize._util import string_or_none
 
 SOURCE_NAME = "akshare.stock_fhps_detail_em"
 NORMALIZE_STAGE = "dividend_normalize"
@@ -25,7 +26,7 @@ def normalize_dividend_detail(
     selected_rows: dict[str, tuple[int, int, int, dict[str, Any]]] = {}
 
     for index, row in enumerate(frame.to_dict(orient="records")):
-        report_period = _string_or_none(row.get("报告期"))
+        report_period = string_or_none(row.get("报告期"))
         if report_period is None:
             errors.append(_error(stock.code, "missing report period", row))
             continue
@@ -80,7 +81,7 @@ def _record_from_row(
         cash_dividend_per_share=_per_share(cash_dividend_per_10_shares),
         ex_dividend_date=_date_or_none(row.get("除权除息日")),
         registration_date=_date_or_none(row.get("股权登记日")),
-        plan_status=_string_or_none(row.get("方案进度")),
+        plan_status=string_or_none(row.get("方案进度")),
         eps=_decimal_or_none(
             row.get("每股收益"),
             field_name="eps",
@@ -118,7 +119,7 @@ def _record_from_row(
 
 
 def _plan_status_priority(value: Any) -> int:
-    status = _string_or_none(value)
+    status = string_or_none(value)
     if status is None:
         return 0
     return PLAN_STATUS_PRIORITY.get(status, 1)
@@ -142,7 +143,7 @@ def _decimal_or_none(
     errors: list[SourceErrorRow],
     allow_percent: bool,
 ) -> Decimal | None:
-    text = _string_or_none(value)
+    text = string_or_none(value)
     if text is None:
         return None
 
@@ -170,7 +171,7 @@ def _per_share(per_10_shares: Decimal | None) -> Decimal | None:
 
 
 def _date_or_none(value: Any) -> date | None:
-    text = _string_or_none(value)
+    text = string_or_none(value)
     if text is None:
         return None
     try:
@@ -181,16 +182,6 @@ def _date_or_none(value: Any) -> date | None:
 
 def _date_or_none_required(text: str) -> date:
     return date.fromisoformat(text[:10].replace("/", "-"))
-
-
-def _string_or_none(value: Any) -> str | None:
-    if value is None or pd.isna(value):
-        return None
-
-    text = str(value).strip()
-    if text in {"", "-", "--", "nan", "NaN", "None"}:
-        return None
-    return text
 
 
 def _error(stock_code: str, message: str, row: dict[str, Any]) -> SourceErrorRow:

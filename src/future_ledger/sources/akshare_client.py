@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 from collections.abc import Callable
 from datetime import UTC, datetime
 
@@ -8,14 +7,13 @@ import akshare as ak  # type: ignore[import-untyped]
 import pandas as pd  # type: ignore[import-untyped]
 from tenacity import Retrying, retry_if_exception_type, stop_after_attempt, wait_exponential
 
-from future_ledger.domain import SourceErrorRow, SourceFetchResult, SourceMetadata
+from future_ledger.domain import SYMBOL_RE, SourceErrorRow, SourceFetchResult, SourceMetadata
 
 SOURCE_NAME = "akshare"
 SPOT_STAGE = "spot_fetch"
 DIVIDEND_STAGE = "dividend_fetch"
 PRICE_STAGE = "price_fetch"
 ALL_A_SYMBOL = "all_a"
-_SYMBOL_RE = re.compile(r"^\d{6}$")
 _RETRY_WAIT = wait_exponential(multiplier=0.5, min=0.5, max=4)
 
 Clock = Callable[[], datetime]
@@ -181,7 +179,7 @@ def _build_result(
 
 
 def _validate_symbol(symbol: str) -> None:
-    if _SYMBOL_RE.fullmatch(symbol) is None:
+    if SYMBOL_RE.fullmatch(symbol) is None:
         raise ValueError("symbol must be a six-digit A-share code")
 
 

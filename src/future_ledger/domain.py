@@ -7,6 +7,7 @@ here.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import date
@@ -14,6 +15,18 @@ from decimal import Decimal
 from pathlib import Path
 from types import MappingProxyType
 from typing import TYPE_CHECKING
+
+SYMBOL_RE = re.compile(r"^\d{6}$")
+
+
+def safe_replace_year(value: date, year: int) -> date:
+    """Replace the year, falling back to Feb 28 for Feb 29 on non-leap years."""
+    try:
+        return value.replace(year=year)
+    except ValueError:
+        if value.month == 2 and value.day == 29:
+            return value.replace(year=year, day=28)
+        raise
 
 if TYPE_CHECKING:
     import pandas as pd  # type: ignore[import-untyped]

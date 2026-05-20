@@ -14,11 +14,10 @@ from typing import Any
 
 import pandas as pd  # type: ignore[import-untyped]
 
-from future_ledger.domain import SourceMetadata
+from future_ledger.domain import SYMBOL_RE, SourceMetadata
 from future_ledger.errors import SourceError
 
 CACHE_STAGES = frozenset({"spot", "dividend_detail", "price_history"})
-_SYMBOL_RE = re.compile(r"^\d{6}$")
 _DATE_RE = re.compile(r"^\d{8}$")
 
 
@@ -126,7 +125,7 @@ def _validate_stage(stage: str) -> None:
 def _validate_symbol(symbol: str) -> None:
     if symbol == "all_a":
         return
-    if _SYMBOL_RE.fullmatch(symbol) is None:
+    if SYMBOL_RE.fullmatch(symbol) is None:
         raise ValueError("symbol must be all_a or a six-digit stock code")
 
 

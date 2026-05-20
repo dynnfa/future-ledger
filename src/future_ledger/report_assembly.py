@@ -231,6 +231,7 @@ def _rank_row(
             dividend_metric_by_key=dividend_metric_by_key,
             return_metric=return_metric,
             source_error_flags=source_error_flags,
+            has_missing_years=has_missing_years,
         ),
         source_priority_used=SOURCE_PRIORITY_USED,
         fetched_at=fetched_at,
@@ -271,11 +272,12 @@ def _data_quality_flags(
     dividend_metric_by_key: dict[tuple[str, str], DividendMetricInput],
     return_metric: ReturnMetricInput | None,
     source_error_flags: Sequence[str],
+    has_missing_years: bool,
 ) -> tuple[str, ...]:
     flags: list[str] = []
     if not window_records:
         flags.append("no_valid_dividend_records")
-    if len({record.report_year for record in window_records}) < config.years:
+    if has_missing_years:
         flags.append("has_missing_years_5y")
 
     for record in window_records:
@@ -366,12 +368,7 @@ def _rank_rows(
 ) -> list[DividendRankRow]:
     ranked_rows = [row for row in rows if row.latest_dividend_yield_pct is not None]
     ranked_rows.sort(
-        key=lambda row: (
-            -row.latest_dividend_yield_pct
-            if row.latest_dividend_yield_pct is not None
-            else Decimal("0"),
-            stock_order[row.stock_code],
-        )
+        key=lambda row: (-row.latest_dividend_yield_pct, stock_order[row.stock_code])  # type: ignore[operator]
     )
 
     ranked_with_numbers: list[DividendRankRow] = []

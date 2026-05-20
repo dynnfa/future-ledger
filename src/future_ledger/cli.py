@@ -95,10 +95,9 @@ def scan(
     except ConfigError as exc:
         raise typer.BadParameter(str(exc)) from exc
 
-    universe_size = len(tables.dividend_rank)
-    processed_count = len(tables.dividend_rank)
-    typer.echo(f"Universe size: {universe_size}")
-    typer.echo(f"Processed stocks: {processed_count}")
+    rank_count = len(tables.dividend_rank)
+    typer.echo(f"Universe size: {rank_count}")
+    typer.echo(f"Processed stocks: {rank_count}")
     typer.echo(f"Source errors: {len(tables.source_errors)}")
     typer.echo(f"Workbook written: {written_path}")
-    typer.echo(f"Rows ranked: {len(tables.dividend_rank)}")
+    typer.echo(f"Rows ranked: {rank_count}")
